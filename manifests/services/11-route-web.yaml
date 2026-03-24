@@ -1,0 +1,16 @@
+# Route OpenShift pour exposer le serveur web vers Internet
+# C'est le seul point d'entrée public de toute l'architecture
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: web-route                 # Nom de la route
+  namespace: openshift-3tiers     # Namespace du projet
+spec:
+  to:
+    kind: Service
+    name: svc-web                 # Pointe vers le Service de la VM2
+  port:
+    targetPort: http              # Utilise le port HTTP (80) défini dans svc-web
+  tls:
+    termination: edge             # OpenShift gère le certificat SSL automatiquement
+  wildcardPolicy: None            # Pas de wildcard — une seule URL
