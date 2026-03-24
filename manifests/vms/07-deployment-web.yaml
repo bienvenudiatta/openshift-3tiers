@@ -1,0 +1,32 @@
+# Deployment OpenShift pour le Serveur Web (Tier 2)
+# Simule un serveur web avec Nginx dans la DMZ
+# Remplace la VirtualMachine KubeVirt — même logique, même réseau DMZ
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: openshift-3tiers
+  labels:
+    app: web                      # Label utilisé par svc-web et les NetworkPolicies
+spec:
+  replicas: 1                     # Une seule instance du serveur web
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: nginx:latest     # Image Nginx officielle — pas besoin d'installer
+          ports:
+            - containerPort: 80   # Port HTTP standard exposé par Nginx
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d  # Dossier de configuration Nginx
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-configmap # Configuration Nginx définie séparément
