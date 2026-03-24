@@ -1,0 +1,65 @@
+# Deployment OpenShift pour la Base de données (Tier 3)
+# Simule un serveur MySQL dans le LAN privé
+# Remplace la VirtualMachine KubeVirt — même logique, même réseau LAN
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: openshift-3tiers
+  labels:
+    app: mysql                    # Label utilisé par svc-db et les NetworkPolicies
+spec:
+  replicas: 1                     # Une seule instance de MySQL
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: db
+          image: mysql:8.0        # Image MySQL officielle version 8
+          ports:
+            - containerPort: 3306 # Port standard MySQL
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret        # Référence au fichier 05-secret-mysql.yaml
+                  key: MYSQL_ROOT_PASSWORD  # Mot de passe root récupéré depuis le Secret
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_DATABASE       # Nom de la base de données
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_USER           # Utilisateur de l'application
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD       # Mot de passe de l'utilisateur
+# ```
+
+# **Ce que fait ce fichier :**
+
+# | Élément | Explication |
+# |---|---|
+# | `kind: Deployment` | Conteneur MySQL au lieu d'une VM |
+# | `app: mysql` | Label qui connecte ce déploiement à `svc-db` et aux NetworkPolicies |
+# | `image: mysql:8.0` | Image Docker officielle MySQL 8 — MySQL est préinstallé et prêt |
+# | `containerPort: 3306` | Port standard MySQL — même port autorisé dans la NetworkPolicy |
+# | `secretKeyRef` | Les mots de passe sont lus depuis `05-secret-mysql.yaml` — jamais écrits en clair |
+# | `replicas: 1` | Une seule instance de MySQL suffisante pour le projet |
+
+# **La chaîne de sécurité reste identique :**
+# ```
+# Internet
+#    ❌ bloqué
+# VM2/web → svc-db:3306 ✅ autorisé
+# Tout autre conteneur  ❌ bloqué par NetworkPolicy
