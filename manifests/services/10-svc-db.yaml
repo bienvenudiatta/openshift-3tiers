@@ -1,41 +1,16 @@
+# Service OpenShift pour la VM3 (Base de données MySQL)
+# Crée une adresse réseau stable pour MySQL à l'intérieur du cluster
 apiVersion: v1
 kind: Service
 metadata:
-  name: svc-db
-  namespace: openshift-3tiers
+  name: svc-db                    # Nom du service — la VM2 utilisera "svc-db" pour contacter MySQL
+  namespace: openshift-3tiers     # Namespace du projet
 spec:
   selector:
-    app: mysql
+    app: mysql                    # Cible la VM3 qui a le label "app: mysql"
   ports:
     - name: mysql
       protocol: TCP
-      port: 3306
-      targetPort: 3306
-  type: ClusterIP
-```
-
-**Ce que fait ce fichier :**
-
-| Élément | Explication |
-|---|---|
-| `kind: Service` | Même principe que svc-web — une adresse stable et permanente |
-| `name: svc-db` | La VM3 sera joignable via ce nom — la VM2 utilisera `svc-db` pour contacter MySQL |
-| `selector: app: mysql` | Fait le lien avec la VM3 grâce au label `app: mysql` qu'on lui a donné |
-| `port: 3306` | Port standard de MySQL — c'est le même port qu'on a autorisé dans la NetworkPolicy |
-| `targetPort: 3306` | Redirige vers le port 3306 de MySQL sur la VM3 |
-| `type: ClusterIP` | Accessible uniquement à l'intérieur du cluster — jamais depuis Internet |
-
-**La chaîne de sécurité complète sur MySQL :**
-```
-Internet
-   ❌ bloqué par iptables (VM1)
-   
-VM2 (web)
-   ✅ autorisé → svc-db:3306
-   grâce à NetworkPolicy allow-web-to-db
-   
-VM3 (MySQL)
-   ✅ reçoit la connexion
-   
-Toute autre VM
-   ❌ bloqué par NetworkPolicy deny-all
+      port: 3306                  # Port standard MySQL
+      targetPort: 3306            # Redirige vers MySQL sur la VM3
+  type: ClusterIP                 # Jamais accessible depuis Internet
