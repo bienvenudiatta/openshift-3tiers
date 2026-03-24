@@ -1,0 +1,75 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm-firewall
+  namespace: openshift-3tiers
+  labels:
+    app: firewall
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        app: firewall
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        memory:
+          guest: 1Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+            - name: dmz
+              bridge: {}
+            - name: lan
+              bridge: {}
+      networks:
+        - name: default
+          pod: {}
+        - name: dmz
+          multus:
+            networkName: dmz-network
+        - name: lan
+          multus:
+            networkName: lan-network
+      volumes:
+        - name: rootdisk
+          containerDisk:
+            image: quay.io/containerdisks/ubuntu:22.04
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              hostname: vm-firewall
+              packages:
+                - iptables
+                - iptables-persistent
+              runcmd:
+                # Activer le forwarding IP (routage entre interfaces)
+                - echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+                - sysctl -p
+
+                # NAT : tout ce qui sort vers Internet passe par eth0
+                - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+                # Autoriser le trafic établi/retour
+                - iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+                # Autoriser Internet → DMZ (port 80 uniquement)
+                - iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 80 -j ACCEPT
+
+                # Autoriser DMZ → LAN (port 3306 MySQL uniquement)
+                - iptables -A FORWARD -i eth1 -o eth2 -p tcp --dport 3306 -j ACCEPT
+
+                # Bloquer tout le reste
+                - iptables -A FORWARD -j DROP
+
+                # Sauvegarder les règles pour qu'elles persistent après reboot
+                - netfilter-persistent save
+      terminationGracePeriodSeconds: 0
