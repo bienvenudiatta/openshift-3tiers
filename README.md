@@ -4,16 +4,18 @@
 
 ## Description
 
-Ce projet déploie une architecture réseau multi-VM sur OpenShift Virtualization, reproduisant un environnement d'entreprise composé d'une passerelle/firewall, d'un serveur web et d'un serveur de base de données. Chaque VM est provisionnée depuis GitHub et configurée pour communiquer selon une topologie LAN/DMZ sécurisée.
+Ce projet déploie une architecture réseau multi-VM sur OpenShift Virtualization,
+reproduisant un environnement d'entreprise composé d'une passerelle/firewall,
+d'un serveur web et d'un serveur de base de données. Chaque VM est provisionnée
+depuis GitHub et configurée pour communiquer selon une topologie LAN/DMZ sécurisée.
 
 ## Architecture
-
 ```
 Internet (NAT)
       │
       ▼
 ┌─────────────────────────────────┐
-│  VM1 — Passerelle / Firewall    │  pfSense ou iptables
+│  VM1 — Passerelle / Firewall    │  Ubuntu 22.04 + iptables
 │  eth0 : NAT (Internet)          │
 │  eth1 : DMZ  192.168.100.0/24   │
 │  eth2 : LAN  192.168.10.0/24    │
@@ -26,35 +28,33 @@ Internet (NAT)
 │  Zone DMZ       │      │  Réseau LAN           │
 │  192.168.100.0  │      │  192.168.10.0/24      │
 │  /24            │      │                       │
-│                 │      │  VM3 — Serveur BD     │
-│  VM2 — Web      │ ───► │  MySQL                │
-│  Nginx + Node   │      │  192.168.10.10        │
-│  192.168.100.10 │      └──────────────────────┘
-└─────────────────┘
+│  VM2 — Web      │ ───► │  VM3 — Serveur BD     │
+│  Nginx + Node   │      │  MySQL                │
+│  192.168.100.10 │      │  192.168.10.10        │
+└─────────────────┘      └──────────────────────┘
 ```
 
 ## Prérequis
 
-- Cluster OpenShift 4.x avec **OpenShift Virtualization** activé (opérateur KubeVirt installé)
-- Opérateur **Multus CNI** installé (pour les réseaux secondaires DMZ/LAN)
+- Compte Red Hat Developer Sandbox (gratuit)
+- OpenShift Virtualization disponible sur le cluster
+- Opérateur Multus CNI installé
 - `oc` CLI configuré et connecté au cluster
-- Accès `cluster-admin` ou droits suffisants sur le namespace
 
 ## Structure du dépôt
-
 ```
 openshift-3tiers/
 ├── README.md
 ├── manifests/
 │   ├── network/
 │   │   ├── 00-namespace.yaml                        # Namespace du projet
-│   │   ├── 01-nad-dmz.yaml                          # NetworkAttachmentDefinition DMZ (192.168.100.0/24)
-│   │   ├── 02-nad-lan.yaml                          # NetworkAttachmentDefinition LAN (192.168.10.0/24)
+│   │   ├── 01-nad-dmz.yaml                          # NetworkAttachmentDefinition DMZ
+│   │   ├── 02-nad-lan.yaml                          # NetworkAttachmentDefinition LAN
 │   │   ├── 03-networkpolicy-deny-all.yaml           # Bloquer tout le trafic par défaut
 │   │   └── 04-networkpolicy-allow-web-db.yaml       # Autoriser web → MySQL:3306
 │   ├── vms/
 │   │   ├── 05-secret-mysql.yaml                     # Secret mot de passe MySQL
-│   │   ├── 06-vm-firewall.yaml                      # VM1 — Passerelle/Firewall
+│   │   ├── 06-vm-firewall.yaml                      # VM1 — Firewall Ubuntu + iptables
 │   │   ├── 07-vm-web.yaml                           # VM2 — Nginx + Node.js (DMZ)
 │   │   └── 08-vm-db.yaml                            # VM3 — MySQL (LAN)
 │   └── services/
@@ -74,55 +74,46 @@ openshift-3tiers/
 
 ## Déploiement
 
-> **Important** : respecter l'ordre de déploiement — réseau d'abord, VMs ensuite, services à la fin.
+> **Important** : respecter l'ordre — réseau d'abord, VMs ensuite, services à la fin.
 
-### 1. Créer le namespace
-
+### 1. Se connecter au cluster
 ```bash
-oc apply -f manifests/network/00-namespace.yaml
-oc project openshift-3tiers
+oc login --token=<ton-token> --server=https://api.sandbox.openshiftapps.com:6443
 ```
 
-### 2. Déployer les réseaux (NAD + NetworkPolicies)
-
+### 2. Déployer les réseaux
 ```bash
 oc apply -f manifests/network/
 ```
 
 Vérification :
-
 ```bash
 oc get network-attachment-definitions
 oc get networkpolicies
 ```
 
 ### 3. Créer le secret MySQL
-
 ```bash
 oc apply -f manifests/vms/05-secret-mysql.yaml
 ```
 
 ### 4. Démarrer les VMs
-
 ```bash
 oc apply -f manifests/vms/
 ```
 
-Vérifier que les VMs sont en cours d'exécution :
-
+Vérification :
 ```bash
 oc get vms
-oc get vmis   # VirtualMachineInstances (VMs actives)
+oc get vmis
 ```
 
 ### 5. Déployer les services et la route
-
 ```bash
 oc apply -f manifests/services/
 ```
 
-Récupérer l'URL d'accès public :
-
+Récupérer l'URL publique :
 ```bash
 oc get route web-route -o jsonpath='{.spec.host}'
 ```
@@ -131,21 +122,18 @@ oc get route web-route -o jsonpath='{.spec.host}'
 
 | Partie | Contenu |
 |--------|---------|
-| **Partie 1 — Virtualisation** | Création des VMs avec KubeVirt (`VirtualMachine` YAML) |
-| **Partie 2 — Déploiement des services** | Installation de Nginx, Node.js, MySQL dans les VMs |
-| **Partie 3 — Réseaux** | Configuration DMZ/LAN via NetworkAttachmentDefinitions et NetworkPolicies |
-| **Partie 4 — Intégration GitHub** | Provisioning automatique via cloud-init depuis ce dépôt |
+| **Partie 1 — Virtualisation** | Création des VMs avec KubeVirt |
+| **Partie 2 — Déploiement des services** | Nginx, Node.js, MySQL via cloud-init |
+| **Partie 3 — Réseaux** | DMZ/LAN via NAD et NetworkPolicies |
+| **Partie 4 — Intégration GitHub** | Provisioning automatique depuis ce dépôt |
 
 ## Sécurité réseau
 
-Les NetworkPolicies appliquent les règles suivantes :
-
-- **Deny all** : tout le trafic entre pods/VMs est bloqué par défaut
-- **Allow web → db** : seule la VM2 (web) peut joindre la VM3 (MySQL) sur le port 3306
-- La VM1 (firewall) assure le NAT et le filtrage entre Internet, la DMZ et le LAN
+- **Deny all** : tout le trafic est bloqué par défaut
+- **Allow web → db** : seul le Tier 2 peut joindre MySQL sur le port 3306
+- **Firewall** : NAT et filtrage iptables entre Internet, DMZ et LAN
 
 ## Vérifications utiles
-
 ```bash
 # État des VMs
 oc get vms -n openshift-3tiers
@@ -153,10 +141,7 @@ oc get vms -n openshift-3tiers
 # Accéder à la console d'une VM
 virtctl console vm-firewall
 
-# SSH dans une VM (si configuré)
-virtctl ssh vm-web
-
-# Logs d'une VMI
+# Logs d'une VM
 oc describe vmi vm-db
 ```
 
