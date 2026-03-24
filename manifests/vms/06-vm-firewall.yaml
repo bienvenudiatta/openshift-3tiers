@@ -1,0 +1,71 @@
+# VM1 — Passerelle/Firewall
+# Point d'entrée unique depuis Internet — filtre tout le trafic avec iptables
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm-firewall
+  namespace: openshift-3tiers
+  labels:
+    app: firewall
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        app: firewall
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        memory:
+          guest: 1Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}        # Interface NAT vers Internet
+            - name: dmz
+              bridge: {}           # Interface vers la DMZ
+            - name: lan
+              bridge: {}           # Interface vers le LAN
+      networks:
+        - name: default
+          pod: {}                  # Réseau principal OpenShift
+        - name: dmz
+          multus:
+            networkName: dmz-network   # NAD créé dans 01-nad-dmz.yaml
+        - name: lan
+          multus:
+            networkName: lan-network   # NAD créé dans 02-nad-lan.yaml
+      volumes:
+        - name: rootdisk
+          containerDisk:
+            image: quay.io/containerdisks/ubuntu:22.04
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              hostname: vm-firewall
+              packages:
+                - iptables
+                - iptables-persistent
+              runcmd:
+                # Activer le forwarding IP
+                - echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+                - sysctl -p
+                # NAT vers Internet
+                - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+                # Autoriser trafic établi
+                - iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+                # Internet → DMZ port 80
+                - iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 80 -j ACCEPT
+                # DMZ → LAN port 3306
+                - iptables -A FORWARD -i eth1 -o eth2 -p tcp --dport 3306 -j ACCEPT
+                # Bloquer tout le reste
+                - iptables -A FORWARD -j DROP
+                # Sauvegarder les règles
+                - netfilter-persistent save
+      terminationGracePeriodSeconds: 0
