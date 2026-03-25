@@ -1,1 +1,46 @@
-
+# Deployment OpenShift pour la Base de données (Tier 3)
+# Simule un serveur MySQL dans le réseau LAN privé
+# Jamais accessible depuis Internet — seul le Tier 2 peut le contacter
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: bienvenucloud-dev
+  labels:
+    app: mysql                    # Label identifiant ce tier
+spec:
+  replicas: 1                     # Une seule instance de MySQL
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: db
+          image: mysql:8.0        # Image MySQL officielle version 8
+          ports:
+            - containerPort: 3306 # Port standard MySQL
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret        # Référence au 05-secret-mysql.yaml
+                  key: MYSQL_ROOT_PASSWORD  # Mot de passe root
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_DATABASE       # Nom de la base de données
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_USER           # Utilisateur de l'application
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD       # Mot de passe utilisateur
