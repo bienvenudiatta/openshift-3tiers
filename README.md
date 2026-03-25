@@ -68,7 +68,6 @@ openshift-3tiers/
     ├── 04-vm-web-running.png
     ├── 05-vm-db-running.png
     ├── 06-route-accessible.png
-    ├── 07-networkpolicies.png
     └── 08-topology.png
 ```
 
