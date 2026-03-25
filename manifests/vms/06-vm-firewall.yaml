@@ -1,3 +1,4 @@
+# VM1 — Passerelle/Firewall
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -39,10 +40,10 @@ spec:
           cloudInitNoCloud:
             userData: |
               #cloud-config
-              user: cloud-user
-              password: cloudpass123
-              chpasswd: { expire: False }
               hostname: vm-firewall
+              user: cloud-user
+              password: openshift123
+              chpasswd: { expire: False }
               packages:
                 - iptables
                 - iptables-persistent
@@ -51,6 +52,8 @@ spec:
                 - sysctl -p
                 - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
                 - iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+                - iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 80 -j ACCEPT
+                - iptables -A FORWARD -i eth1 -o eth2 -p tcp --dport 3306 -j ACCEPT
                 - iptables -A FORWARD -j DROP
                 - netfilter-persistent save
       terminationGracePeriodSeconds: 0
