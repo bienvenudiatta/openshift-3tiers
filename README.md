@@ -1,24 +1,24 @@
-# Déploiement d'une architecture réseau 3-tiers sur OpenShift
+# Déploiement d'une architecture réseau 3-tiers virtualisée sur OpenShift
 
-> Projet de fin de module — OpenShift (Red Hat Developer Sandbox)
+> Projet de fin de module — OpenShift Virtualization (KubeVirt)
 
 ## Description
 
-Ce projet déploie une architecture réseau 3-tiers sur OpenShift, reproduisant
-un environnement d'entreprise composé d'une passerelle/firewall, d'un serveur
-web et d'un serveur de base de données. Chaque service est provisionné depuis
-GitHub et configuré pour communiquer selon une topologie LAN/DMZ sécurisée
-grâce aux NetworkPolicies OpenShift.
+Ce projet déploie une architecture réseau multi-VM sur OpenShift Virtualization,
+reproduisant un environnement d'entreprise composé d'une passerelle/firewall,
+d'un serveur web et d'un serveur de base de données. Chaque VM est provisionnée
+depuis GitHub et configurée pour communiquer selon une topologie LAN/DMZ sécurisée.
 
 ## Architecture
 ```
-Internet
+Internet (NAT)
       │
       ▼
 ┌─────────────────────────────────┐
-│  Tier 1 — Firewall              │  Ubuntu 22.04 + iptables
-│  Filtre le trafic entrant       │
-│  NAT vers Internet              │
+│  VM1 — Passerelle / Firewall    │  Ubuntu 22.04 + iptables
+│  eth0 : NAT (Internet)          │
+│  eth1 : DMZ  192.168.100.0/24   │
+│  eth2 : LAN  192.168.10.0/24    │
 └────────────┬────────────────────┘
              │
      ┌───────┴──────────────────────┐
@@ -26,18 +26,20 @@ Internet
      ▼                              ▼
 ┌─────────────────┐      ┌──────────────────────┐
 │  Zone DMZ       │      │  Réseau LAN           │
-│                 │      │                       │
-│  Tier 2 — Web   │ ───► │  Tier 3 — Base de     │
-│  Nginx          │      │  données MySQL 8.0    │
-│  Port 80        │      │  Port 3306            │
+│  192.168.100.0  │      │  192.168.10.0/24      │
+│  /24            │      │                       │
+│  VM2 — Web      │ ───► │  VM3 — Serveur BD     │
+│  Nginx          │      │  MySQL 8.0            │
+│  192.168.100.10 │      │  192.168.10.10        │
 └─────────────────┘      └──────────────────────┘
 ```
 
 ## Prérequis
 
 - Compte Red Hat Developer Sandbox (gratuit)
+- OpenShift Virtualization disponible sur le cluster
+- Opérateur Multus CNI installé
 - `oc` CLI configuré et connecté au cluster
-- Accès au namespace `bienvenucloud-dev`
 
 ## Structure du dépôt
 ```
@@ -52,9 +54,9 @@ openshift-3tiers/
 │   │   └── 04-networkpolicy-allow-web-db.yaml       # Autoriser web → MySQL:3306
 │   ├── vms/
 │   │   ├── 05-secret-mysql.yaml                     # Secret mot de passe MySQL
-│   │   ├── 06-deployment-firewall.yaml              # Tier 1 — Firewall Ubuntu + iptables
-│   │   ├── 07-deployment-web.yaml                   # Tier 2 — Nginx (DMZ)
-│   │   └── 08-deployment-db.yaml                    # Tier 3 — MySQL (LAN)
+│   │   ├── 06-vm-firewall.yaml                      # VM1 — Firewall Ubuntu + iptables
+│   │   ├── 07-vm-web.yaml                           # VM2 — Nginx (DMZ)
+│   │   └── 08-vm-db.yaml                            # VM3 — MySQL (LAN)
 │   └── services/
 │       ├── 09-svc-web.yaml                          # Service exposant Nginx
 │       ├── 10-svc-db.yaml                           # Service interne MySQL
@@ -62,18 +64,19 @@ openshift-3tiers/
 └── screenshots/
     ├── 01-namespace.png
     ├── 02-networkpolicies.png
-    ├── 03-firewall-running.png
-    ├── 04-web-running.png
-    ├── 05-db-running.png
+    ├── 03-vm-firewall-running.png
+    ├── 04-vm-web-running.png
+    ├── 05-vm-db-running.png
     ├── 06-route-accessible.png
-    └── 07-topology.png
+    ├── 07-networkpolicies.png
+    └── 08-topology.png
 ```
 
 ## Déploiement
 
-> **Important** : respecter l'ordre — réseau d'abord, deployments ensuite, services à la fin.
+> **Important** : respecter l'ordre — réseau d'abord, VMs ensuite, services à la fin.
 
-### 1. Se connecter au Sandbox
+### 1. Se connecter au cluster
 ```bash
 oc login --token=<ton-token> --server=https://api.rm3.7wse.p1.openshiftapps.com:6443
 oc project bienvenucloud-dev
@@ -91,25 +94,20 @@ oc apply -f manifests/network/03-networkpolicy-deny-all.yaml
 oc apply -f manifests/network/04-networkpolicy-allow-web-db.yaml
 ```
 
-Vérification :
-```bash
-oc get networkpolicies
-```
-
 ### 4. Créer le secret MySQL
 ```bash
 oc apply -f manifests/vms/05-secret-mysql.yaml
 ```
 
-### 5. Déployer les services applicatifs
+### 5. Démarrer les VMs
 ```bash
 oc apply -f manifests/vms/
 ```
 
 Vérification :
 ```bash
-oc get deployments
-oc get pods
+oc get vms
+oc get vmis
 ```
 
 ### 6. Déployer les services et la route
@@ -126,9 +124,9 @@ oc get route web-route -o jsonpath='{.spec.host}'
 
 | Partie | Contenu |
 |--------|---------|
-| **Partie 1 — Virtualisation** | Création des Deployments (Firewall, Web, MySQL) |
-| **Partie 2 — Déploiement des services** | Nginx, iptables, MySQL via images Docker |
-| **Partie 3 — Réseaux** | NetworkPolicies DMZ/LAN + Services + Route |
+| **Partie 1 — Virtualisation** | Création des VMs avec KubeVirt |
+| **Partie 2 — Déploiement des services** | Nginx, Node.js, MySQL via cloud-init |
+| **Partie 3 — Réseaux** | DMZ/LAN via NAD et NetworkPolicies |
 | **Partie 4 — Intégration GitHub** | Provisioning automatique depuis ce dépôt |
 
 ## Sécurité réseau
@@ -139,20 +137,14 @@ oc get route web-route -o jsonpath='{.spec.host}'
 
 ## Vérifications utiles
 ```bash
-# État des deployments
-oc get deployments -n bienvenucloud-dev
+# État des VMs
+oc get vms -n bienvenucloud-dev
 
-# État des pods
-oc get pods -n bienvenucloud-dev
+# Accéder à la console d'une VM
+virtctl console vm-firewall
 
-# Logs du firewall
-oc logs deployment/firewall
-
-# Logs du serveur web
-oc logs deployment/web
-
-# URL publique
-oc get route web-route
+# Logs d'une VM
+oc describe vmi vm-db
 ```
 
 ## Auteur
