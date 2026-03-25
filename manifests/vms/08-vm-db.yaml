@@ -1,6 +1,4 @@
 # VM3 — Serveur Base de données (MySQL)
-# Situé dans le LAN privé — jamais accessible depuis Internet
-# Seule la VM2 peut le contacter sur le port 3306
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -9,7 +7,7 @@ metadata:
   labels:
     app: mysql
 spec:
-  running: true
+  runStrategy: Always
   template:
     metadata:
       labels:
@@ -25,17 +23,15 @@ spec:
             - name: rootdisk
               disk:
                 bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
           interfaces:
             - name: default
               masquerade: {}
-            - name: lan
-              bridge: {}
       networks:
         - name: default
           pod: {}
-        - name: lan
-          multus:
-            networkName: lan-network
       volumes:
         - name: rootdisk
           containerDisk:
@@ -45,6 +41,9 @@ spec:
             userData: |
               #cloud-config
               hostname: vm-db
+              user: cloud-user
+              password: openshift123
+              chpasswd: { expire: False }
               packages:
                 - mysql-server
               runcmd:
