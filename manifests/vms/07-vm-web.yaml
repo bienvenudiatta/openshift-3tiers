@@ -1,5 +1,4 @@
 # VM2 — Serveur Web (Nginx)
-# Situé dans la DMZ — reçoit les requêtes HTTP depuis Internet via le firewall
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -8,7 +7,7 @@ metadata:
   labels:
     app: web
 spec:
-  running: true
+  runStrategy: Always
   template:
     metadata:
       labels:
@@ -24,17 +23,15 @@ spec:
             - name: rootdisk
               disk:
                 bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
           interfaces:
             - name: default
               masquerade: {}
-            - name: dmz
-              bridge: {}
       networks:
         - name: default
           pod: {}
-        - name: dmz
-          multus:
-            networkName: dmz-network
       volumes:
         - name: rootdisk
           containerDisk:
@@ -44,6 +41,9 @@ spec:
             userData: |
               #cloud-config
               hostname: vm-web
+              user: cloud-user
+              password: openshift123
+              chpasswd: { expire: False }
               packages:
                 - nginx
                 - nodejs
