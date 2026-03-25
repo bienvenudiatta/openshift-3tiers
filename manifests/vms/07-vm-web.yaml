@@ -1,0 +1,54 @@
+# VM2 — Serveur Web (Nginx)
+# Situé dans la DMZ — reçoit les requêtes HTTP depuis Internet via le firewall
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm-web
+  namespace: bienvenucloud-dev
+  labels:
+    app: web
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        memory:
+          guest: 1Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+            - name: dmz
+              bridge: {}
+      networks:
+        - name: default
+          pod: {}
+        - name: dmz
+          multus:
+            networkName: dmz-network
+      volumes:
+        - name: rootdisk
+          containerDisk:
+            image: quay.io/containerdisks/ubuntu:22.04
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              hostname: vm-web
+              packages:
+                - nginx
+                - nodejs
+                - npm
+              runcmd:
+                - systemctl enable nginx
+                - systemctl start nginx
+      terminationGracePeriodSeconds: 0
