@@ -38,6 +38,14 @@ spec:
             image: quay.io/containerdisks/ubuntu:22.04
         - name: cloudinitdisk
           cloudInitNoCloud:
-            userDataSecretRef:
-              name: web-html-secret
+            userData: |
+              #cloud-config
+              hostname: vm-web
+              user: cloud-user
+              password: openshift123
+              chpasswd: {expire: False}
+              runcmd:
+                - apt-get update -y && apt-get install -y nginx
+                - systemctl enable nginx && systemctl start nginx
+                - echo '<html><head><title>3-Tiers OpenShift</title></head><body style="background:#0a0a1a;color:#fff;font-family:Arial;text-align:center"><h1 style="color:#e00;padding:40px">Architecture 3-Tiers sur OpenShift</h1><p>Firewall | Serveur Web | Base de donnees</p><p style="color:#00ff88">Deploye par Bienvenu Diatta</p></body></html>' > /var/www/html/index.html
       terminationGracePeriodSeconds: 0
