@@ -1,4 +1,5 @@
 # VM1 — Passerelle/Firewall
+# Connectée à Internet, DMZ (192.168.100.0/24) et LAN (192.168.10.0/24)
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -29,9 +30,19 @@ spec:
           interfaces:
             - name: default
               masquerade: {}
+            - name: dmz
+              bridge: {}           # Interface DMZ
+            - name: lan
+              bridge: {}           # Interface LAN
       networks:
         - name: default
           pod: {}
+        - name: dmz
+          multus:
+            networkName: k8s.ovn.org/dmz-network    # UDN DMZ
+        - name: lan
+          multus:
+            networkName: k8s.ovn.org/lan-network    # UDN LAN
       volumes:
         - name: rootdisk
           containerDisk:
@@ -43,13 +54,15 @@ spec:
               hostname: vm-firewall
               user: cloud-user
               password: openshift123
-              chpasswd: { expire: False }
-              packages:
-                - iptables
-                - iptables-persistent
+              chpasswd: {expire: False}
               runcmd:
+                - apt-get update -y && apt-get install -y iptables iptables-persistent
                 - echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
                 - sysctl -p
+                - ip addr add 192.168.100.1/24 dev eth1
+                - ip link set eth1 up
+                - ip addr add 192.168.10.1/24 dev eth2
+                - ip link set eth2 up
                 - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
                 - iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
                 - iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 80 -j ACCEPT
