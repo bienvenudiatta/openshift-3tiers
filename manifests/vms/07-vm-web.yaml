@@ -1,4 +1,5 @@
-# VM2 — Serveur Web (Nginx)
+# VM2 — Serveur Web (Nginx + Node.js)
+# Connectée au réseau DMZ (192.168.100.0/24)
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -29,9 +30,14 @@ spec:
           interfaces:
             - name: default
               masquerade: {}
+            - name: dmz
+              bridge: {}           # Interface DMZ
       networks:
         - name: default
           pod: {}
+        - name: dmz
+          multus:
+            networkName: k8s.ovn.org/dmz-network    # UDN DMZ
       volumes:
         - name: rootdisk
           containerDisk:
@@ -45,7 +51,9 @@ spec:
               password: openshift123
               chpasswd: {expire: False}
               runcmd:
-                - apt-get update -y && apt-get install -y nginx
+                - apt-get update -y && apt-get install -y nginx nodejs --no-install-recommends
                 - systemctl enable nginx && systemctl start nginx
-                - echo '<html><head><title>3-Tiers OpenShift</title></head><body style="background:#0a0a1a;color:#fff;font-family:Arial;text-align:center"><h1 style="color:#e00;padding:40px">Architecture 3-Tiers sur OpenShift</h1><p>Firewall | Serveur Web | Base de donnees</p><p style="color:#00ff88">Deploye par Bienvenu Diatta</p></body></html>' > /var/www/html/index.html
+                - ip addr add 192.168.100.10/24 dev eth1
+                - ip link set eth1 up
+                - curl -fsSL https://raw.githubusercontent.com/bienvenudiatta/openshift-3tiers/main/manifests/vms/index.html -o /var/www/html/index.html
       terminationGracePeriodSeconds: 0
