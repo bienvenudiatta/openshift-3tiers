@@ -37,7 +37,7 @@ spec:
           pod: {}
         - name: dmz
           multus:
-            networkName: k8s.ovn.org/dmz-network    # UDN DMZ
+            networkName: bienvenucloud-dev/dmz-network    # UDN DMZ
       volumes:
         - name: rootdisk
           containerDisk:
