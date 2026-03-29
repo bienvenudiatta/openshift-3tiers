@@ -1,4 +1,4 @@
-# VM2 — Serveur Web (Nginx + Node.js)
+# VM2 — Serveur Web (Nginx)
 # Connectée au réseau DMZ (192.168.100.0/24)
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
@@ -31,13 +31,13 @@ spec:
             - name: default
               masquerade: {}
             - name: dmz
-              bridge: {}           # Interface DMZ
+              bridge: {}
       networks:
         - name: default
           pod: {}
         - name: dmz
           multus:
-            networkName: bienvenucloud-dev/dmz-network    # UDN DMZ
+            networkName: bienvenucloud-dev/dmz-network
       volumes:
         - name: rootdisk
           containerDisk:
@@ -49,11 +49,22 @@ spec:
               hostname: vm-web
               user: cloud-user
               password: openshift123
-              chpasswd: {expire: False}
+              chpasswd: { expire: False }
+
               runcmd:
-                - apt-get update -y && apt-get install -y nginx nodejs --no-install-recommends
+                - apt-get update -y && apt-get install -y nginx --no-install-recommends
                 - systemctl enable nginx && systemctl start nginx
+
+                # Activer interface DMZ
+                - ip link set enp2s0 up
+
+                # Config IP
                 - ip addr add 192.168.100.10/24 dev enp2s0
-                - ip link set enp3s0 up
+
+                # Route vers firewall
+                - ip route add default via 192.168.100.1
+
+                # Page web
                 - curl -fsSL https://raw.githubusercontent.com/bienvenudiatta/openshift-3tiers/main/manifests/vms/index.html -o /var/www/html/index.html
+
       terminationGracePeriodSeconds: 0
