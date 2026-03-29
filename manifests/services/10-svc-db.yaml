@@ -1,16 +1,14 @@
-# Service OpenShift pour la VM3 (Base de données MySQL)
-# Crée une adresse réseau stable pour MySQL à l'intérieur du cluster
 apiVersion: v1
 kind: Service
 metadata:
-  name: svc-db                    # Nom du service — la VM2 utilisera "svc-db" pour contacter MySQL
-  namespace: openshift-3tiers     # Namespace du projet
+  name: svc-db
+  namespace: bienvenucloud-dev
 spec:
   selector:
-    app: mysql                    # Cible la VM3 qui a le label "app: mysql"
+    app: mysql
   ports:
     - name: mysql
       protocol: TCP
-      port: 3306                  # Port standard MySQL
-      targetPort: 3306            # Redirige vers MySQL sur la VM3
-  type: ClusterIP                 # Jamais accessible depuis Internet
+      port: 3306
+      targetPort: 3306
+  type: ClusterIP
