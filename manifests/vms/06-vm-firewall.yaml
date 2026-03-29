@@ -59,14 +59,14 @@ spec:
                 - apt-get update -y && apt-get install -y iptables iptables-persistent
                 - echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
                 - sysctl -p
-                - ip addr add 192.168.100.1/24 dev eth1
+                - ip addr add 192.168.100.1/24 dev enp2s0
                 - ip link set eth1 up
-                - ip addr add 192.168.10.1/24 dev eth2
+                - ip addr add 192.168.10.1/24 dev enp3s0
                 - ip link set eth2 up
                 - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
                 - iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-                - iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 80 -j ACCEPT
-                - iptables -A FORWARD -i eth1 -o eth2 -p tcp --dport 3306 -j ACCEPT
+                - iptables -A FORWARD -i eth0 -o enp2s0 -p tcp --dport 80 -j ACCEPT
+                - iptables -A FORWARD -i eth1 -o enp3s0 -p tcp --dport 3306 -j ACCEPT
                 - iptables -A FORWARD -j DROP
                 - netfilter-persistent save
       terminationGracePeriodSeconds: 0
