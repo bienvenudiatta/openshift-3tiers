@@ -51,31 +51,9 @@ spec:
               password: openshift123
               chpasswd: {expire: False}
               runcmd:
-                # - apt-get update -y && apt-get install -y nginx nodejs --no-install-recommends
-                # - systemctl enable nginx && systemctl start nginx
-                # - ip addr add 192.168.100.10/24 dev eth1
-                              # - ip link set eth1 up
-                - apt-get update -y && apt-get install -y nginx nodejs netplan.io
-              
-                - |
-                  cat <<EOF > /etc/netplan/01-netcfg.yaml
-                  network:
-                    version: 2
-                    renderer: networkd
-                    ethernets:
-                      eth0:
-                        dhcp4: true
-                      eth1:
-                        addresses:
-                          - 192.168.100.10/24
-                        gateway4: 192.168.100.1
-                        nameservers:
-                          addresses: [8.8.8.8, 1.1.1.1]
-                  EOF
-              
-                - netplan apply
-              
-                - systemctl enable nginx
-                - systemctl start nginx
+                - apt-get update -y && apt-get install -y nginx nodejs --no-install-recommends
+                - systemctl enable nginx && systemctl start nginx
+                - ip addr add 192.168.100.10/24 dev eth1
+                - ip link set eth1 up
                 - curl -fsSL https://raw.githubusercontent.com/bienvenudiatta/openshift-3tiers/main/manifests/vms/index.html -o /var/www/html/index.html
       terminationGracePeriodSeconds: 0
