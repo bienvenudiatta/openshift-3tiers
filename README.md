@@ -9,6 +9,13 @@ reproduisant un environnement d'entreprise composé d'une passerelle/firewall,
 d'un serveur web et d'un serveur de base de données. Chaque VM est provisionnée
 depuis GitHub et configurée pour communiquer selon une topologie LAN/DMZ sécurisée.
 
+## Objectif du projet
+Ce projet vise à :
+- Simuler une architecture réseau d’entreprise 3-tiers
+- Appliquer des règles de sécurité réseau (DMZ, LAN, firewall)
+- Déployer des machines virtuelles avec OpenShift Virtualization
+- Automatiser le déploiement via GitHub
+
 ## Architecture
 ```
 Internet (NAT)
