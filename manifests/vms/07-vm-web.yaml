@@ -52,7 +52,7 @@ spec:
               chpasswd: { expire: False }
 
               runcmd:
-                - apt-get update -y && apt-get install -y nginx --no-install-recommends
+                # - apt-get update -y --no-install-recommends
                 - systemctl enable nginx && systemctl start nginx
 
                 # Activer interface DMZ
