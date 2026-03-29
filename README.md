@@ -16,6 +16,18 @@ Ce projet vise à :
 - Déployer des machines virtuelles avec OpenShift Virtualization
 - Automatiser le déploiement via GitHub
 
+## Technologies utilisées
+- OpenShift Virtualization (KubeVirt)
+- Kubernetes / OpenShift
+Réseaux définis via UserDefinedNetworks (UDN)
+Création de deux réseaux isolés :
+- DMZ : 192.168.100.0/24
+- LAN : 192.168.10.0/24- Ubuntu 22.04
+- Nginx
+- MySQL 8.0
+- iptables (Firewall)
+- GitHub (CI/CD simple)
+
 ## Architecture
 ```
 Internet (NAT)
