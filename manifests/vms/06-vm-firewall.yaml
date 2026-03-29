@@ -31,18 +31,18 @@ spec:
             - name: default
               masquerade: {}
             - name: dmz
-              bridge: {}           # Interface DMZ
+              bridge: {}
             - name: lan
-              bridge: {}           # Interface LAN
+              bridge: {}
       networks:
         - name: default
           pod: {}
         - name: dmz
           multus:
-            networkName: bienvenucloud-dev/dmz-network    # UDN DMZ
+            networkName: bienvenucloud-dev/dmz-network
         - name: lan
           multus:
-            networkName: bienvenucloud-dev/lan-network    # UDN LAN
+            networkName: bienvenucloud-dev/lan-network
       volumes:
         - name: rootdisk
           containerDisk:
@@ -54,19 +54,42 @@ spec:
               hostname: vm-firewall
               user: cloud-user
               password: openshift123
-              chpasswd: {expire: False}
+              chpasswd: { expire: False }
+
               runcmd:
                 - apt-get update -y && apt-get install -y iptables iptables-persistent
+
+                # Activer le routage IP
                 - echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
                 - sysctl -p
+
+                # Activer interfaces
+                - ip link set enp2s0 up
+                - ip link set enp3s0 up
+
+                # Configuration IP
                 - ip addr add 192.168.100.1/24 dev enp2s0
-                - ip link set eth1 up
                 - ip addr add 192.168.10.1/24 dev enp3s0
-                - ip link set eth2 up
-                - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+                # NAT vers Internet
+                - iptables -t nat -A POSTROUTING -o enp1s0 -j MASQUERADE
+
+                # Autoriser connexions établies
                 - iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-                - iptables -A FORWARD -i eth0 -o enp2s0 -p tcp --dport 80 -j ACCEPT
-                - iptables -A FORWARD -i eth1 -o enp3s0 -p tcp --dport 3306 -j ACCEPT
+
+                # Internet → DMZ (HTTP)
+                - iptables -A FORWARD -i enp1s0 -o enp2s0 -p tcp --dport 80 -j ACCEPT
+
+                # DMZ → LAN (MySQL)
+                - iptables -A FORWARD -i enp2s0 -o enp3s0 -p tcp --dport 3306 -j ACCEPT
+
+                # Autoriser ICMP (ping)
+                - iptables -A FORWARD -p icmp -j ACCEPT
+
+                # Bloquer le reste
                 - iptables -A FORWARD -j DROP
+
+                # Sauvegarde
                 - netfilter-persistent save
+
       terminationGracePeriodSeconds: 0
