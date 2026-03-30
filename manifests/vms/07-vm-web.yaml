@@ -1,5 +1,81 @@
-# VM2 — Serveur Web (Nginx + Node.js)
-# Connectée au réseau DMZ (192.168.100.0/24)
+# # VM2 — Serveur Web (Nginx + Node.js)
+# # Connectée au réseau DMZ (192.168.100.0/24)
+# apiVersion: kubevirt.io/v1
+# kind: VirtualMachine
+# metadata:
+#   name: vm-web
+#   namespace: bienvenucloud-dev
+#   labels:
+#     app: web
+# spec:
+#   runStrategy: Always
+#   template:
+#     metadata:
+#       labels:
+#         app: web
+#     spec:
+#       domain:
+#         cpu:
+#           cores: 1
+#         memory:
+#           guest: 1Gi
+#         devices:
+#           disks:
+#             - name: rootdisk
+#               disk:
+#                 bus: virtio
+#             - name: cloudinitdisk
+#               disk:
+#                 bus: virtio
+#           interfaces:
+#             - name: default
+#               masquerade: {}
+#             - name: dmz
+#               bridge: {}
+#       networks:
+#         - name: default
+#           pod: {}
+#         - name: dmz
+#           multus:
+#             networkName: bienvenucloud-dev/dmz-network
+#       volumes:
+#         - name: rootdisk
+#           containerDisk:
+#             image: quay.io/containerdisks/ubuntu:22.04
+#         - name: cloudinitdisk
+#           cloudInitNoCloud:
+#             userData: |
+#               #cloud-config
+#               hostname: vm-web
+#               user: cloud-user
+#               password: openshift123
+#               chpasswd: {expire: False}
+#               packages:
+#                 - nginx
+#                 - nodejs
+#               runcmd:
+#                 - systemctl enable nginx
+#                 - systemctl start nginx
+#                 - ip link set enp2s0 up
+#                 - ip addr add 192.168.100.10/24 dev enp2s0 || true
+#                 - ip route add default via 192.168.100.1 || true
+#                 - curl -fsSL https://raw.githubusercontent.com/bienvenudiatta/openshift-3tiers/main/manifests/vms/index.html -o /var/www/html/index.html || true
+#                 - |
+#                   cat > /etc/systemd/system/network-dmz.service << 'SVCEOF'
+#                   [Unit]
+#                   Description=DMZ Network Config
+#                   After=network-online.target
+#                   Wants=network-online.target
+#                   [Service]
+#                   Type=oneshot
+#                   RemainAfterExit=yes
+#                   ExecStart=/bin/bash -c 'ip link set enp2s0 up; ip addr add 192.168.100.10/24 dev enp2s0 || true; systemctl start nginx'
+#                   [Install]
+#                   WantedBy=multi-user.target
+#                   SVCEOF
+#                 - systemctl enable network-dmz.service
+#       terminationGracePeriodSeconds: 0
+
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -18,7 +94,7 @@ spec:
         cpu:
           cores: 1
         memory:
-          guest: 1Gi
+          guest: 2Gi
         devices:
           disks:
             - name: rootdisk
@@ -53,17 +129,19 @@ spec:
               packages:
                 - nginx
                 - nodejs
+                - curl
               runcmd:
                 - systemctl enable nginx
                 - systemctl start nginx
                 - ip link set enp2s0 up
                 - ip addr add 192.168.100.10/24 dev enp2s0 || true
-                - ip route add default via 192.168.100.1 || true
+                - sleep 10
                 - curl -fsSL https://raw.githubusercontent.com/bienvenudiatta/openshift-3tiers/main/manifests/vms/index.html -o /var/www/html/index.html || true
+                - systemctl restart nginx
                 - |
-                  cat > /etc/systemd/system/network-dmz.service << 'SVCEOF'
+                  cat > /etc/systemd/system/network-dmz.service << 'EOF'
                   [Unit]
-                  Description=DMZ Network Config
+                  Description=DMZ Network and Nginx
                   After=network-online.target
                   Wants=network-online.target
                   [Service]
@@ -72,6 +150,6 @@ spec:
                   ExecStart=/bin/bash -c 'ip link set enp2s0 up; ip addr add 192.168.100.10/24 dev enp2s0 || true; systemctl start nginx'
                   [Install]
                   WantedBy=multi-user.target
-                  SVCEOF
+                  EOF
                 - systemctl enable network-dmz.service
       terminationGracePeriodSeconds: 0
