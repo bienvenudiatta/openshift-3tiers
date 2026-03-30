@@ -1,4 +1,4 @@
-# VM2 — Serveur Web (Nginx)
+# VM2 — Serveur Web (Nginx + Node.js)
 # Connectée au réseau DMZ (192.168.100.0/24)
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
@@ -49,22 +49,29 @@ spec:
               hostname: vm-web
               user: cloud-user
               password: openshift123
-              chpasswd: { expire: False }
-
+              chpasswd: {expire: False}
+              packages:
+                - nginx
+                - nodejs
               runcmd:
-                # - apt-get update -y --no-install-recommends
-                - systemctl enable nginx && systemctl start nginx
-
-                # Activer interface DMZ
+                - systemctl enable nginx
+                - systemctl start nginx
                 - ip link set enp2s0 up
-
-                # Config IP
-                - ip addr add 192.168.100.10/24 dev enp2s0
-
-                # Route vers firewall
-                - ip route add default via 192.168.100.1
-
-                # Page web
-                - curl -fsSL https://raw.githubusercontent.com/bienvenudiatta/openshift-3tiers/main/manifests/vms/index.html -o /var/www/html/index.html
-
+                - ip addr add 192.168.100.10/24 dev enp2s0 || true
+                - ip route add default via 192.168.100.1 || true
+                - curl -fsSL https://raw.githubusercontent.com/bienvenudiatta/openshift-3tiers/main/manifests/vms/index.html -o /var/www/html/index.html || true
+                - |
+                  cat > /etc/systemd/system/network-dmz.service << 'SVCEOF'
+                  [Unit]
+                  Description=DMZ Network Config
+                  After=network-online.target
+                  Wants=network-online.target
+                  [Service]
+                  Type=oneshot
+                  RemainAfterExit=yes
+                  ExecStart=/bin/bash -c 'ip link set enp2s0 up; ip addr add 192.168.100.10/24 dev enp2s0 || true; systemctl start nginx'
+                  [Install]
+                  WantedBy=multi-user.target
+                  SVCEOF
+                - systemctl enable network-dmz.service
       terminationGracePeriodSeconds: 0
